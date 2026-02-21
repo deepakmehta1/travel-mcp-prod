@@ -72,11 +72,12 @@ _session: Optional[ClientSession] = None
 _client: Optional[AsyncOpenAI] = None
 _llm_tools: list = []
 _stdio_client_cm = None  # Keep the context manager alive
+_conversation_history: list[dict] = []  # Persistent conversation history
 
 
 async def initialize_session():
     """Initialize MCP session and OpenAI client on startup"""
-    global _session, _client, _llm_tools, _stdio_client_cm
+    global _session, _client, _llm_tools, _stdio_client_cm, _conversation_history
     
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -140,36 +141,39 @@ async def initialize_session():
         "Converted tools for LLM",
         extra={"tool_count": len(_llm_tools)},
     )
-
-
-async def process_query(user_query: str) -> str:
-    """Process a user query through the agent"""
-    global _session, _client, _llm_tools
     
-    if not _session or not _client or not _llm_tools:
-        raise RuntimeError("Agent not initialized")
-    
-    model = os.getenv("LLM_MODEL", "gpt-4o")
-    
-    system_prompt = """You are a travel booking assistant and customer executive. Your goal is to help customers book travel tours.
+    # Initialize conversation with system prompt
+    _conversation_history.clear()
+    _conversation_history.append({
+        "role": "system",
+        "content": """You are a travel booking assistant and customer executive. Your goal is to help customers book travel tours.
 You have access to tools to:
 1. Look up customer information by phone number
 2. Search for available tours based on destination and budget
 3. Book a tour for a customer
 
 Be proactive, professional, and ask for information if needed. Use the tools strategically to complete the booking process.
-When you have enough information and have successfully booked a tour, conclude the conversation professionally.
-Always be polite and provide clear summaries of actions taken."""
+Always be polite and provide clear summaries of actions taken. Remember all details provided by the customer in this conversation."""
+    })
 
+
+
+async def process_query(user_query: str) -> str:
+    """Process a user query through the agent"""
+    global _session, _client, _llm_tools, _conversation_history
+    
+    if not _session or not _client or not _llm_tools:
+        raise RuntimeError("Agent not initialized")
+    
+    model = os.getenv("LLM_MODEL", "gpt-4o")
+    
     logger.info(
-        "Starting agent conversation",
-        extra={"user_request": user_query},
+        "Processing user query",
+        extra={"user_request": user_query, "conversation_turn": len(_conversation_history)},
     )
 
-    conversation_history: list[dict] = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_query},
-    ]
+    # Append user message to persistent conversation history
+    _conversation_history.append({"role": "user", "content": user_query})
 
     max_iterations = 20
     iteration = 0
@@ -180,7 +184,7 @@ Always be polite and provide clear summaries of actions taken."""
 
         response = await _client.chat.completions.create(
             model=model,
-            messages=conversation_history,
+            messages=_conversation_history,
             tools=_llm_tools,
             tool_choice="auto",
         )
@@ -216,7 +220,7 @@ Always be polite and provide clear summaries of actions taken."""
                 for tc in assistant_message.tool_calls
             ]
 
-        conversation_history.append(assistant_msg)
+        _conversation_history.append(assistant_msg)
 
         # If LLM wants to call tools
         if assistant_message.tool_calls:
@@ -258,7 +262,7 @@ Always be polite and provide clear summaries of actions taken."""
                 )
 
             # Feed tool results back into LLM
-            conversation_history.extend(tool_results_messages)
+            _conversation_history.extend(tool_results_messages)
             continue  # next iteration
 
         # No tool calls -> LLM is giving final answer
@@ -332,6 +336,43 @@ async def query_endpoint(request: QueryRequest):
         )
 
 
+@app.post("/reset")
+async def reset_conversation():
+    """Reset the conversation history"""
+    global _conversation_history
+    logger.info("Resetting conversation history")
+    
+    # Clear and reinitialize with system prompt
+    _conversation_history.clear()
+    _conversation_history.append({
+        "role": "system",
+        "content": """You are a travel booking assistant and customer executive. Your goal is to help customers book travel tours.
+You have access to tools to:
+1. Look up customer information by phone number
+2. Search for available tours based on destination and budget
+3. Book a tour for a customer
+
+Be proactive, professional, and ask for information if needed. Use the tools strategically to complete the booking process.
+Always be polite and provide clear summaries of actions taken. Remember all details provided by the customer in this conversation."""
+    })
+    
+    return {"success": True, "message": "Conversation history reset"}
+
+
+@app.get("/conversation-info")
+async def conversation_info():
+    """Get current conversation info"""
+    global _conversation_history
+    # Count non-system messages
+    user_turns = sum(1 for msg in _conversation_history if msg.get("role") == "user")
+    assistant_turns = sum(1 for msg in _conversation_history if msg.get("role") == "assistant")
+    
+    return {
+        "total_messages": len(_conversation_history),
+        "user_turns": user_turns,
+        "assistant_turns": assistant_turns,
+        "conversation_active": len(_conversation_history) > 1
+    }
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")

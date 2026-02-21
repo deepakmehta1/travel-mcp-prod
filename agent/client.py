@@ -76,6 +76,36 @@ class TravelAgentClient:
             logger.error(f"✗ Query failed: {e}")
             return None
     
+    def reset_conversation(self) -> bool:
+        """Reset the conversation history"""
+        try:
+            url = f"{self.base_url}/reset"
+            response = self.session.post(url, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            if data.get("success"):
+                logger.info("✓ Conversation reset successfully")
+                return True
+            else:
+                logger.error("✗ Failed to reset conversation")
+                return False
+        except Exception as e:
+            logger.error(f"✗ Reset failed: {e}")
+            return False
+    
+    def get_conversation_info(self) -> Optional[dict]:
+        """Get current conversation information"""
+        try:
+            url = f"{self.base_url}/conversation-info"
+            response = self.session.get(url, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            logger.info(f"✓ Conversation info: {data['user_turns']} user turns, {data['assistant_turns']} assistant turns")
+            return data
+        except Exception as e:
+            logger.error(f"✗ Failed to get conversation info: {e}")
+            return None
+    
     def print_response(self, response: str):
         """Pretty print agent response"""
         print("\n" + "="*70)
@@ -138,8 +168,12 @@ def interactive_mode(client: TravelAgentClient):
     print("="*70)
     print("Commands:")
     print("  - Type your query and press Enter to send")
-    print("  - Type 'quit' or 'exit' to close")
+    print("  - Type 'reset' to start a new conversation")
+    print("  - Type 'info' to see conversation status")
     print("  - Type 'health' to check agent status")
+    print("  - Type 'quit' or 'exit' to close")
+    print("\n💡 Tip: The agent remembers the entire conversation context!")
+    print("    Provide details once and refer back to them naturally.")
     print("="*70 + "\n")
     
     while True:
@@ -155,6 +189,25 @@ def interactive_mode(client: TravelAgentClient):
             
             if user_input.lower() == "health":
                 client.health_check()
+                continue
+            
+            if user_input.lower() == "reset":
+                if client.reset_conversation():
+                    print("✓ Conversation reset. Start fresh!\n")
+                else:
+                    print("✗ Failed to reset conversation\n")
+                continue
+            
+            if user_input.lower() == "info":
+                info = client.get_conversation_info()
+                if info:
+                    print(f"\nℹ️  Conversation Status:")
+                    print(f"   Total messages: {info['total_messages']}")
+                    print(f"   Your turns: {info['user_turns']}")
+                    print(f"   Agent turns: {info['assistant_turns']}")
+                    print(f"   Active: {'Yes' if info['conversation_active'] else 'No'}\n")
+                else:
+                    print("✗ Failed to get conversation info\n")
                 continue
             
             response = client.query(user_input)
