@@ -11,6 +11,7 @@ services:
       context: ./agent
     image: travel-mcp-agent:latest
     # No depends_on, because agent doesn't need mcp-server *running*, only the image built.
+    env_file: .env
     environment:
       - SERVER_IMAGE=travel-mcp-server:latest
     volumes:
