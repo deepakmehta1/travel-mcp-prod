@@ -12,8 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY agent.py logging.conf ./
+COPY agent.py client.py logging.conf ./
 
 ENV SERVER_IMAGE=travel-mcp-server:latest
+ENV HOST=0.0.0.0
+ENV PORT=8000
 
-ENTRYPOINT ["python", "agent.py"]
+EXPOSE 8000

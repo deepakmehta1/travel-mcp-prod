@@ -1,3 +1,7 @@
 mcp
 python-json-logger
 openai
+fastapi
+uvicorn[standard]
+requests
+pydantic
