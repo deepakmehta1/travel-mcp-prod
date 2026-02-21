@@ -3,18 +3,24 @@ services:
     build:
       context: ./server
     image: travel-mcp-server:latest
-    # This service is here just so `docker compose build` creates the image.
-    # We don't actually need to run this service; the agent uses `docker run` on the image.
+    # This service builds the image used by the agent.
+    # The agent uses `docker run` to execute this image, so we don't need to run this service.
+    profiles: ["build"]
 
   agent:
     build:
       context: ./agent
     image: travel-mcp-agent:latest
-    # No depends_on, because agent doesn't need mcp-server *running*, only the image built.
+    container_name: travel-agent
     env_file: .env
     environment:
       - SERVER_IMAGE=travel-mcp-server:latest
+      - HOST=0.0.0.0
+      - PORT=8000
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8000:8000"
     stdin_open: true
     tty: true
+    command: python agent.py
