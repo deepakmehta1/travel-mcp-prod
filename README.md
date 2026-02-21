@@ -1,31 +1,59 @@
 # travel-mcp-prod
 
-How to run and see the flow
-From travel-mcp-prod:
+## How to run and see the flow
 
-bash
+### LLM-Based Agent (Now using reasoning to decide on tools)
+
+The agent has been upgraded to use an LLM with prompts to intelligently decide which tools to call, instead of following hardcoded logic.
+
+**Prerequisites:**
+- Set the `OPENAI_API_KEY` environment variable with your OpenAI API key
+- Optionally set `LLM_MODEL` to specify which model to use (defaults to `gpt-4o`)
+
+**Running the agent:**
+
+```bash
 # 1. Build images
 docker compose build
 
-# 2. Run the agent (which internally starts the server container)
+# 2. Set your OpenAI API key (before running docker compose)
+export OPENAI_API_KEY="your-key-here"
+
+# 3. Run the agent (which internally starts the server container)
 docker compose up agent
-You will see:
+```
 
-agent logs showing:
+**What you will see:**
 
-starting the server container,
+- Agent logs showing:
+  - Starting the server container
+  - Tools available from the MCP server
+  - LLM reasoning and decision-making process
+  - Each tool call and its arguments
+  - Tool results being fed back to the LLM
+  - Final booking result after LLM reasoning
 
-tools listed,
+**How it works:**
 
-each tool call and arguments,
+1. The LLM-based agent receives a user request (booking a travel tour)
+2. It analyzes available tools and decides which ones to call based on the request
+3. It calls tools via the MCP server in the appropriate order
+4. Tool results are fed back to the LLM for further analysis
+5. The LLM continues the loop until the task is complete
+6. The agentic loop has a maximum of 20 iterations to prevent infinite loops
 
-final booking result.
+**Environment variables:**
 
-The mcp-server container will appear transiently (created and removed) each time the agent runs it; if you want it to be long‑lived instead, you can:
+- `OPENAI_API_KEY`: Required. Your OpenAI API key
+- `LLM_MODEL`: Optional. LLM model to use (default: `gpt-4o`)
+- `SERVER_IMAGE`: Optional. Docker image for the MCP server (default: `travel-mcp-server:latest`)
 
-change the server transport to HTTP (mcp.run(transport="streamable-http", host="0.0.0.0", port=8000")),
+---
 
-expose port 8000 in the server Dockerfile and docker‑compose,
+## Alternative: Long-lived HTTP Server
 
-switch the client to HTTP transport (FastMCP / MCP SDK supports that).
-​
+The mcp-server container will appear transiently (created and removed) each time the agent runs it. If you want it to be long‑lived instead, you can:
+
+- Change the server transport to HTTP (`mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)`)
+- Expose port 8000 in the server Dockerfile and docker‑compose
+- Switch the client to HTTP transport (FastMCP / MCP SDK supports that)
