@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  mcp-server:
+    build:
+      context: ./server
+    image: travel-mcp-server:latest
+    # Not started directly in this flow; agent will run it as needed via `docker run -i`
+    # You could also run it as a long-lived HTTP server if you switch to StreamableHTTP.[web:82][web:81]
+    profiles: ["build-only"]
+
+  agent:
+    build:
+      context: ./agent
+    image: travel-mcp-agent:latest
+    depends_on:
+      - mcp-server
+    environment:
+      - SERVER_IMAGE=travel-mcp-server:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # So you can see logs on console
+    stdin_open: true
+    tty: true
