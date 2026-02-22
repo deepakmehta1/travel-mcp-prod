@@ -6,6 +6,7 @@ from .config import load_settings
 from .logging_config import configure_logging, get_logger
 from .models import QueryRequest, QueryResponse, HealthResponse
 from .service import AgentService, process_query
+from .cors import add_cors
 
 
 @asynccontextmanager
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Travel Booking Agent", version="1.0.0", lifespan=lifespan)
+    add_cors(app)
 
     @app.get("/health", response_model=HealthResponse)
     async def health_check():

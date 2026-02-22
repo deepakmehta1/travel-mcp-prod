@@ -88,6 +88,13 @@ docker compose build
 docker compose up
 ```
 
+### Frontend (optional)
+```bash
+cd frontend
+npm install
+VITE_AGENT_URL=http://localhost:8000 npm run dev
+```
+
 ### Test the Docker Version
 ```bash
 # In another terminal

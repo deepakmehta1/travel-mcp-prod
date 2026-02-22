@@ -1,0 +1,12 @@
+:root {
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+button { font-family: inherit; }
+textarea { font-family: inherit; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: #1f2a44; border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
