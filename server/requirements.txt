@@ -1,3 +1,4 @@
 mcp[fm]
 fastmcp
 python-json-logger
+psycopg[binary]

@@ -9,6 +9,7 @@ The agent has been upgraded to use an LLM with prompts to intelligently decide w
 **Prerequisites:**
 - Set the `OPENAI_API_KEY` environment variable with your OpenAI API key
 - Optionally set `LLM_MODEL` to specify which model to use (defaults to `gpt-4o`)
+- Postgres database available for the MCP server
 
 **Running the agent:**
 
@@ -19,7 +20,14 @@ docker compose build
 # 2. Set your OpenAI API key (before running docker compose)
 export OPENAI_API_KEY="your-key-here"
 
-# 3. Run the agent (which internally starts the server container)
+# 3. Start Postgres (if using docker compose)
+docker compose up -d postgres
+
+# 4. Configure Postgres for the MCP server container
+export DATABASE_URL="postgresql://postgres:postgres@travel-postgres:5432/travel"
+export MCP_SERVER_DOCKER_NETWORK="travel-mcp-prod_default"
+
+# 5. Run the agent (which internally starts the server container)
 docker compose up agent
 ```
 
@@ -47,6 +55,8 @@ docker compose up agent
 - `OPENAI_API_KEY`: Required. Your OpenAI API key
 - `LLM_MODEL`: Optional. LLM model to use (default: `gpt-4o`)
 - `SERVER_IMAGE`: Optional. Docker image for the MCP server (default: `travel-mcp-server:latest`)
+- `DATABASE_URL`: Required for Postgres. Connection string used by the MCP server
+- `MCP_SERVER_DOCKER_NETWORK`: Optional. Docker network for the MCP server container (needed to reach `travel-postgres`)
 
 ---
 
