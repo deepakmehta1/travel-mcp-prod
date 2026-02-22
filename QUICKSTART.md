@@ -15,13 +15,21 @@ pip install -r agent/requirements.txt
 # Option A: Set in terminal
 export OPENAI_API_KEY="your-openai-api-key"
 export LLM_MODEL="gpt-4o"
+export DATABASE_URL="postgresql://postgres:postgres@travel-postgres:5432/travel"
+export MCP_SERVER_DOCKER_NETWORK="travel-mcp-prod_default"
 
 # Option B: Create .env file (recommended for Docker)
 cp .env.example .env
 # Edit .env and add your OPENAI_API_KEY
 ```
+Note: `MCP_SERVER_DOCKER_NETWORK` depends on your compose project name. Use `docker network ls` to confirm.
 
-### Step 3: Start the Agent Server
+### Step 3: Start Postgres
+```bash
+docker compose up -d postgres
+```
+
+### Step 4: Start the Agent Server
 ```bash
 python agent/agent.py
 ```
@@ -69,7 +77,8 @@ Open browser and visit: http://localhost:8000/docs
 # Build images
 docker compose build
 
-# Run everything
+# Ensure .env includes DATABASE_URL and MCP_SERVER_DOCKER_NETWORK
+# Then run everything
 docker compose up
 ```
 
@@ -101,6 +110,7 @@ AGENT_URL=http://localhost:8000 python agent/client.py --samples
 | Issue | Solution |
 |-------|----------|
 | `OPENAI_API_KEY not set` | Set: `export OPENAI_API_KEY="your-key"` |
+| `MCP server cannot connect to Postgres` | Ensure Postgres is running and `DATABASE_URL` + `MCP_SERVER_DOCKER_NETWORK` are set |
 | `Connection refused` | Make sure agent is running: `python agent/agent.py` |
 | `Port 8000 already in use` | Use different port: `PORT=8001 python agent/agent.py` |
 | `Docker daemon not running` | Start Docker daemon (on Mac: open Docker.app) |

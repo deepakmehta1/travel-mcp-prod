@@ -89,14 +89,32 @@ async def initialize_session():
     logger.info("Starting LLM-based agent", extra={"model": model})
     logger.info("Starting server container via docker run", extra={"image": SERVER_IMAGE})
 
+    server_env = {}
+    for key in (
+        "DATABASE_URL",
+        "PGHOST",
+        "PGPORT",
+        "PGUSER",
+        "PGPASSWORD",
+        "PGDATABASE",
+    ):
+        value = os.getenv(key)
+        if value:
+            server_env[key] = value
+
+    docker_args = ["run", "-i", "--rm"]
+    network_name = os.getenv("MCP_SERVER_DOCKER_NETWORK")
+    if network_name:
+        docker_args += ["--network", network_name]
+
+    for key, value in server_env.items():
+        docker_args += ["-e", f"{key}={value}"]
+
+    docker_args.append(SERVER_IMAGE)
+
     server_params = StdioServerParameters(
         command="docker",
-        args=[
-            "run",
-            "-i",
-            "--rm",
-            SERVER_IMAGE,
-        ],
+        args=docker_args,
         env=None,
     )
 
