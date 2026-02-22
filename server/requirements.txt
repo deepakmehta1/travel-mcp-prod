@@ -2,3 +2,5 @@ mcp[fm]
 fastmcp
 python-json-logger
 psycopg[binary]
+psycopg_pool
+pydantic
