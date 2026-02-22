@@ -13,6 +13,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY agent.py client.py logging.conf startup.sh ./
+COPY app ./app
+
+ENV PYTHONPATH=/app
 
 RUN chmod +x /app/startup.sh
 
