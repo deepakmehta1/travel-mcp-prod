@@ -5,21 +5,38 @@ from typing import Any, Dict
 from fastmcp import FastMCP
 from pydantic import ValidationError
 
-from .models import (
-    BookTourRequest,
-    BookTourResponse,
-    LookupCustomerByPhoneRequest,
-    LookupCustomerByPhoneResponse,
-    SearchToursRequest,
-    SearchToursResponse,
-)
-from .repositories import (
-    create_booking,
-    get_customer_by_id,
-    get_customer_by_phone,
-    get_tour_by_code,
-    search_tours,
-)
+try:
+    from .models import (
+        BookTourRequest,
+        BookTourResponse,
+        LookupCustomerByPhoneRequest,
+        LookupCustomerByPhoneResponse,
+        SearchToursRequest,
+        SearchToursResponse,
+    )
+    from .repositories import (
+        create_booking,
+        get_customer_by_id,
+        get_customer_by_phone,
+        get_tour_by_code,
+        search_tours,
+    )
+except ImportError:
+    from models import (
+        BookTourRequest,
+        BookTourResponse,
+        LookupCustomerByPhoneRequest,
+        LookupCustomerByPhoneResponse,
+        SearchToursRequest,
+        SearchToursResponse,
+    )
+    from repositories import (
+        create_booking,
+        get_customer_by_id,
+        get_customer_by_phone,
+        get_tour_by_code,
+        search_tours,
+    )
 
 logger = logging.getLogger("server")
 
@@ -31,7 +48,7 @@ def register_tools(mcp: FastMCP) -> None:
             req = LookupCustomerByPhoneRequest(phone=phone)
         except ValidationError as exc:
             logger.warning("Invalid request", extra={"errors": exc.errors()})
-            return {"found": False, "error": "INVALID_REQUEST"}
+            return LookupCustomerByPhoneResponse(found=False, error="INVALID_REQUEST").model_dump()
 
         logger.info("lookupCustomerByPhone called", extra={"phone": req.phone})
         customer = get_customer_by_phone(phone)
@@ -48,7 +65,7 @@ def register_tools(mcp: FastMCP) -> None:
             req = SearchToursRequest(destination=destination, budget=budget)
         except ValidationError as exc:
             logger.warning("Invalid request", extra={"errors": exc.errors()})
-            return {"tours": [], "error": "INVALID_REQUEST"}
+            return SearchToursResponse(tours=[], error="INVALID_REQUEST").model_dump()
 
         logger.info(
             "searchTours called",

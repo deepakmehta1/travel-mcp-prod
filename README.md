@@ -10,6 +10,7 @@ The agent has been upgraded to use an LLM with prompts to intelligently decide w
 - Set the `OPENAI_API_KEY` environment variable with your OpenAI API key
 - Optionally set `LLM_MODEL` to specify which model to use (defaults to `gpt-4o`)
 - Postgres database available for the MCP server
+- Booking and payment MCP agents reachable over HTTP
 
 **Running the agent:**
 
@@ -27,7 +28,7 @@ docker compose up -d postgres
 export DATABASE_URL="postgresql://postgres:postgres@travel-postgres:5432/travel"
 export MCP_SERVER_DOCKER_NETWORK="travel-mcp-prod_default"
 
-# 5. Run the agent (which internally starts the server container)
+# 5. Start booking + payment agents and the customer executive agent
 docker compose up agent
 ```
 
@@ -54,9 +55,10 @@ docker compose up agent
 
 - `OPENAI_API_KEY`: Required. Your OpenAI API key
 - `LLM_MODEL`: Optional. LLM model to use (default: `gpt-4o`)
-- `SERVER_IMAGE`: Optional. Docker image for the MCP server (default: `travel-mcp-server:latest`)
 - `DATABASE_URL`: Required for Postgres. Connection string used by the MCP server
 - `MCP_SERVER_DOCKER_NETWORK`: Optional. Docker network for the MCP server container (needed to reach `travel-postgres`)
+- `BOOKING_AGENT_URL`: Booking agent MCP endpoint (default: `http://booking-agent:9001`)
+- `PAYMENT_AGENT_URL`: Payment agent MCP endpoint (default: `http://payment-agent:9002`)
 
 ---
 

@@ -1,6 +1,9 @@
 from typing import Any
 
-from .db import get_pool
+try:
+    from .db import get_pool
+except ImportError:
+    from db import get_pool
 
 
 def get_customer_by_phone(phone: str) -> dict[str, Any] | None:
