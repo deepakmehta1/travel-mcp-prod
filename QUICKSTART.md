@@ -29,7 +29,12 @@ Note: `MCP_SERVER_DOCKER_NETWORK` depends on your compose project name. Use `doc
 docker compose up -d postgres
 ```
 
-### Step 4: Start the Agent Server
+### Step 4: Start Booking + Payment MCP Agents
+```bash
+docker compose up -d booking-agent payment-agent
+```
+
+### Step 5: Start the Agent Server
 ```bash
 python agent/agent.py
 ```
@@ -55,6 +60,7 @@ You: I want to book a travel tour. My phone number is +919999999999. I'm interes
 ```bash
 python agent/client.py --samples
 ```
+Sample set includes a payment-consent flow so you can see booking + fake payment working end-to-end.
 
 **Option C: Use cURL**
 ```bash
@@ -77,7 +83,7 @@ Open browser and visit: http://localhost:8000/docs
 # Build images
 docker compose build
 
-# Ensure .env includes DATABASE_URL and MCP_SERVER_DOCKER_NETWORK
+# Ensure .env includes DATABASE_URL, BOOKING_AGENT_URL, PAYMENT_AGENT_URL
 # Then run everything
 docker compose up
 ```
@@ -111,6 +117,7 @@ AGENT_URL=http://localhost:8000 python agent/client.py --samples
 |-------|----------|
 | `OPENAI_API_KEY not set` | Set: `export OPENAI_API_KEY="your-key"` |
 | `MCP server cannot connect to Postgres` | Ensure Postgres is running and `DATABASE_URL` + `MCP_SERVER_DOCKER_NETWORK` are set |
+| `Booking/Payment agent not reachable` | Make sure `booking-agent` and `payment-agent` are running and URLs are correct |
 | `Connection refused` | Make sure agent is running: `python agent/agent.py` |
 | `Port 8000 already in use` | Use different port: `PORT=8001 python agent/agent.py` |
 | `Docker daemon not running` | Start Docker daemon (on Mac: open Docker.app) |

@@ -4,7 +4,10 @@ from typing import Optional
 from psycopg.types.json import Json
 from psycopg_pool import ConnectionPool
 
-from .config import build_conninfo, get_settings
+try:
+    from .config import build_conninfo, get_settings
+except ImportError:
+    from config import build_conninfo, get_settings
 
 logger = logging.getLogger("server")
 

@@ -3,6 +3,7 @@ import json
 import logging
 import logging.config
 import os
+from urllib.parse import urlparse, urlunparse
 from typing import Optional
 from contextlib import asynccontextmanager
 
@@ -10,8 +11,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
 from mcp import types  # noqa: F401
 from openai import AsyncOpenAI
 
@@ -29,7 +30,8 @@ else:
 
 logger = logging.getLogger("agent")
 
-SERVER_IMAGE = os.getenv("SERVER_IMAGE", "travel-mcp-server:latest")
+BOOKING_AGENT_URL = os.getenv("BOOKING_AGENT_URL", "http://booking-agent:9001/mcp")
+PAYMENT_AGENT_URL = os.getenv("PAYMENT_AGENT_URL", "http://payment-agent:9002/mcp")
 
 RESERVED_LOG_ATTRS = {
     "name", "msg", "args", "created", "filename", "funcName", "levelname", 
@@ -68,16 +70,26 @@ class HealthResponse(BaseModel):
 
 
 # Global state for session
-_session: Optional[ClientSession] = None
+_booking_session: Optional[ClientSession] = None
+_payment_session: Optional[ClientSession] = None
 _client: Optional[AsyncOpenAI] = None
 _llm_tools: list = []
-_stdio_client_cm = None  # Keep the context manager alive
+_booking_client_cm = None  # Keep the context manager alive
+_payment_client_cm = None  # Keep the context manager alive
+_tool_routing: dict[str, tuple[ClientSession, str]] = {}
 _conversation_history: list[dict] = []  # Persistent conversation history
 
 
 async def initialize_session():
     """Initialize MCP session and OpenAI client on startup"""
-    global _session, _client, _llm_tools, _stdio_client_cm, _conversation_history
+    global _booking_session
+    global _payment_session
+    global _client
+    global _llm_tools
+    global _booking_client_cm
+    global _payment_client_cm
+    global _tool_routing
+    global _conversation_history
     
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -86,74 +98,172 @@ async def initialize_session():
     _client = AsyncOpenAI(api_key=api_key)
     model = os.getenv("LLM_MODEL", "gpt-4o")
 
+    def _normalize_mcp_url(url: str) -> str:
+        parsed = urlparse(url)
+        if not parsed.path or parsed.path == "/":
+            parsed = parsed._replace(path="/mcp")
+        return urlunparse(parsed)
+
+    booking_url = _normalize_mcp_url(BOOKING_AGENT_URL)
+    payment_url = _normalize_mcp_url(PAYMENT_AGENT_URL)
+
     logger.info("Starting LLM-based agent", extra={"model": model})
-    logger.info("Starting server container via docker run", extra={"image": SERVER_IMAGE})
-
-    server_env = {}
-    for key in (
-        "DATABASE_URL",
-        "PGHOST",
-        "PGPORT",
-        "PGUSER",
-        "PGPASSWORD",
-        "PGDATABASE",
-    ):
-        value = os.getenv(key)
-        if value:
-            server_env[key] = value
-
-    docker_args = ["run", "-i", "--rm"]
-    network_name = os.getenv("MCP_SERVER_DOCKER_NETWORK")
-    if network_name:
-        docker_args += ["--network", network_name]
-
-    for key, value in server_env.items():
-        docker_args += ["-e", f"{key}={value}"]
-
-    docker_args.append(SERVER_IMAGE)
-
-    server_params = StdioServerParameters(
-        command="docker",
-        args=docker_args,
-        env=None,
+    logger.info(
+        "Connecting MCP agents",
+        extra={
+            "booking_agent_url": booking_url,
+            "payment_agent_url": payment_url,
+        },
     )
 
-    # Properly manage context managers
-    _stdio_client_cm = stdio_client(server_params)
-    read, write = await _stdio_client_cm.__aenter__()
-    
-    _session = ClientSession(read, write)
-    await _session.__aenter__()
-    
-    await _session.initialize()
-    tools_response = await _session.list_tools()
-    mcp_tools = tools_response.tools
-    logger.info("Tools listed", extra={"tool_count": len(mcp_tools)})
+    if not booking_url or not payment_url:
+        raise ValueError("BOOKING_AGENT_URL and PAYMENT_AGENT_URL must be set")
 
-    for t in mcp_tools:
-        logger.info(
-            "Tool available",
-            extra={"tool_name": t.name, "tool_description": t.description},
-        )
+    # Add startup delay to allow services to stabilize
+    startup_delay = float(os.getenv("STARTUP_DELAY", "0"))
+    if startup_delay > 0:
+        logger.info("Waiting before MCP initialization", extra={"delay_seconds": startup_delay})
+        try:
+            await asyncio.sleep(startup_delay)
+        except asyncio.CancelledError:
+            logger.warning("Startup was cancelled during initial delay")
+            raise
 
-    # Convert MCP tools → OpenAI tools format
+    async def _wait_for_tcp(url: str, retries: int, delay: float, name: str):
+        parsed = urlparse(url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 80
+        last_exc: Exception | None = None
+        for attempt in range(1, retries + 1):
+            try:
+                reader, writer = await asyncio.open_connection(host, port)
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+                return
+            except Exception as exc:
+                last_exc = exc
+                logger.info(
+                    "Waiting for MCP agent port",
+                    extra={"agent": name, "host": host, "port": port, "attempt": attempt, "error": str(exc)},
+                )
+                if attempt < retries:
+                    await asyncio.sleep(delay)
+        raise RuntimeError(f"Timed out waiting for {name} MCP agent at {host}:{port}") from last_exc
+
+    async def _start_mcp_session(url: str, name: str):
+        max_retries = int(os.getenv("MCP_CONNECT_RETRIES", "15"))
+        delay_seconds = float(os.getenv("MCP_CONNECT_DELAY", "1.0"))
+        await _wait_for_tcp(url, max_retries, delay_seconds, name)
+
+        last_exc: Exception | None = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                cm = streamable_http_client(url)
+                entered = False
+                try:
+                    logger.info("Attempting MCP session initialization", extra={"agent": name, "url": url, "attempt": attempt})
+                    result = await cm.__aenter__()
+                    entered = True
+                    read, write = result[0], result[1]
+                    session = ClientSession(read, write)
+                    await session.__aenter__()
+                    await session.initialize()
+                    logger.info("MCP session initialized successfully", extra={"agent": name, "url": url})
+                    return session, cm
+                except Exception as exc:
+                    last_exc = exc
+                    logger.warning(
+                        "MCP connect failed after port was reachable",
+                        extra={"agent": name, "url": url, "attempt": attempt, "error": str(exc)},
+                    )
+                    if entered:
+                        try:
+                            await cm.__aexit__(None, None, None)
+                        except Exception:
+                            pass
+                    if attempt < max_retries:
+                        try:
+                            await asyncio.sleep(delay_seconds)
+                        except asyncio.CancelledError:
+                            logger.warning("Startup was cancelled while waiting to retry MCP connection", extra={"agent": name})
+                            raise
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                last_exc = exc
+                logger.warning("Unexpected error during MCP connection", extra={"agent": name, "error": str(exc)})
+                if attempt < max_retries:
+                    try:
+                        await asyncio.sleep(delay_seconds)
+                    except asyncio.CancelledError:
+                        raise
+
+        raise RuntimeError(f"Failed to connect to {name} MCP agent at {url}") from last_exc
+
+    try:
+        _booking_session, _booking_client_cm = await _start_mcp_session(booking_url, "booking")
+    except Exception as e:
+        logger.error("Failed to initialize booking agent session", extra={"error": str(e)})
+        logger.warning("Booking agent will not be available")
+        _booking_session = None
+        _booking_client_cm = None
+    
+    try:
+        _payment_session, _payment_client_cm = await _start_mcp_session(payment_url, "payment")
+    except Exception as e:
+        logger.error("Failed to initialize payment agent session", extra={"error": str(e)})
+        logger.warning("Payment agent will not be available")
+        _payment_session = None
+        _payment_client_cm = None
+
     _llm_tools = []
-    for tool in mcp_tools:
-        input_schema = tool.inputSchema or {}
-        _llm_tools.append(
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description or "",
-                    "parameters": {
-                        "type": "object",
-                        "properties": input_schema.get("properties", {}),
-                        "required": input_schema.get("required", []),
-                    },
+    _tool_routing = {}
+
+    async def _register_tools(prefix: str, session: ClientSession):
+        if session is None:
+            logger.warning("Session not available for tools registration", extra={"prefix": prefix})
+            return
+        
+        tools_response = await session.list_tools()
+        mcp_tools = tools_response.tools
+        logger.info("Tools listed", extra={"agent": prefix, "tool_count": len(mcp_tools)})
+
+        for t in mcp_tools:
+            logger.info(
+                "Tool available",
+                extra={
+                    "agent": prefix,
+                    "tool_name": t.name,
+                    "tool_description": t.description,
                 },
-            }
-        )
+            )
+
+        for tool in mcp_tools:
+            input_schema = tool.inputSchema or {}
+            tool_name = f"{prefix}__{tool.name}"
+            _tool_routing[tool_name] = (session, tool.name)
+            _llm_tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "description": tool.description or "",
+                        "parameters": {
+                            "type": "object",
+                            "properties": input_schema.get("properties", {}),
+                            "required": input_schema.get("required", []),
+                        },
+                    },
+                }
+            )
+
+    if _booking_session:
+        await _register_tools("booking", _booking_session)
+    if _payment_session:
+        await _register_tools("payment", _payment_session)
 
     logger.info(
         "Converted tools for LLM",
@@ -169,19 +279,25 @@ You have access to tools to:
 1. Look up customer information by phone number
 2. Search for available tours based on destination and budget
 3. Book a tour for a customer
+4. Process a payment (fake for now)
 
 Be proactive, professional, and ask for information if needed. Use the tools strategically to complete the booking process.
-Always be polite and provide clear summaries of actions taken. Remember all details provided by the customer in this conversation."""
+Always be polite and provide clear summaries of actions taken. Remember all details provided by the customer in this conversation.
+Before calling any payment tool, you must obtain explicit user consent in the conversation."""
     })
 
 
 
 async def process_query(user_query: str) -> str:
     """Process a user query through the agent"""
-    global _session, _client, _llm_tools, _conversation_history
+    global _booking_session, _payment_session, _client, _llm_tools, _tool_routing, _conversation_history
     
-    if not _session or not _client or not _llm_tools:
-        raise RuntimeError("Agent not initialized")
+    if not _client:
+        raise RuntimeError("Agent not initialized - OpenAI client unavailable")
+    
+    if not _llm_tools:
+        logger.warning("No tools available - MCP agents may not be connected")
+        return "Sorry, the agent tools are not currently available. Please check that the booking and payment services are running."
     
     model = os.getenv("LLM_MODEL", "gpt-4o")
     
@@ -256,10 +372,16 @@ async def process_query(user_query: str) -> str:
                     },
                 )
 
-                mcp_result = await _session.call_tool(
-                    tool_name, arguments=tool_args
-                )
-                result_data = json.loads(mcp_result.content[0].text)
+                routing = _tool_routing.get(tool_name)
+                if not routing:
+                    logger.warning("Unknown tool requested", extra={"tool_name": tool_name})
+                    result_data = {"error": "UNKNOWN_TOOL"}
+                else:
+                    session, actual_tool_name = routing
+                    mcp_result = await session.call_tool(
+                        actual_tool_name, arguments=tool_args
+                    )
+                    result_data = json.loads(mcp_result.content[0].text)
 
                 logger.info(
                     "Tool result received",
@@ -308,17 +430,21 @@ async def process_query(user_query: str) -> str:
 # FastAPI lifespan events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _session, _stdio_client_cm
+    global _booking_session, _payment_session, _booking_client_cm, _payment_client_cm
     # Startup
     logger.info("Application startup: initializing agent")
     await initialize_session()
     yield
     # Shutdown
     logger.info("Application shutdown")
-    if _session:
-        await _session.__aexit__(None, None, None)
-    if _stdio_client_cm:
-        await _stdio_client_cm.__aexit__(None, None, None)
+    if _booking_session:
+        await _booking_session.__aexit__(None, None, None)
+    if _payment_session:
+        await _payment_session.__aexit__(None, None, None)
+    if _booking_client_cm:
+        await _booking_client_cm.__aexit__(None, None, None)
+    if _payment_client_cm:
+        await _payment_client_cm.__aexit__(None, None, None)
 
 
 app = FastAPI(title="Travel Booking Agent", version="1.0.0", lifespan=lifespan)

@@ -141,6 +141,13 @@ def run_sample_scenarios(client: TravelAgentClient):
                 "I might be interested in booking something soon."
             ),
         },
+        {
+            "name": "Booking With Payment Consent",
+            "query": (
+                "I want to book the Goa tour. My phone is +919999999999. "
+                "Budget 40000. I consent to pay by card (last4 4242) and authorize the charge."
+            ),
+        },
     ]
     
     for i, scenario in enumerate(scenarios, 1):

@@ -20,6 +20,14 @@ class TourModel(BaseModel):
     destination: str
 
 
+class TourSummaryModel(BaseModel):
+    code: str
+    name: str
+    price: int
+    nights: int
+    destination: str
+
+
 class BookingModel(BaseModel):
     id: int
     customer_id: int
@@ -37,6 +45,7 @@ class LookupCustomerByPhoneRequest(BaseModel):
 class LookupCustomerByPhoneResponse(BaseModel):
     found: bool
     customer: CustomerModel | None = None
+    error: str | None = None
 
 
 class SearchToursRequest(BaseModel):
@@ -45,7 +54,8 @@ class SearchToursRequest(BaseModel):
 
 
 class SearchToursResponse(BaseModel):
-    tours: list[dict[str, Any]]
+    tours: list[TourSummaryModel]
+    error: str | None = None
 
 
 class BookTourRequest(BaseModel):

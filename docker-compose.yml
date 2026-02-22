@@ -16,13 +16,41 @@ services:
       timeout: 3s
       retries: 5
 
-  mcp-server:
+  booking-agent:
     build:
       context: ./server
-    image: travel-mcp-server:latest
-    # This service builds the image used by the agent.
-    # The agent uses `docker run` to execute this image, so we don't need to run this service.
-    profiles: ["build"]
+    image: travel-booking-agent:latest
+    env_file: .env
+    environment:
+      - MCP_TRANSPORT=streamable-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=9001
+    ports:
+      - "9001:9001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 9001), timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  payment-agent:
+    build:
+      context: ./payment_agent
+    image: travel-payment-agent:latest
+    environment:
+      - MCP_TRANSPORT=streamable-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=9002
+    ports:
+      - "9002:9002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 9002), timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
 
   agent:
     build:
@@ -31,16 +59,23 @@ services:
     container_name: travel-agent
     env_file: .env
     environment:
-      - SERVER_IMAGE=travel-mcp-server:latest
       - HOST=0.0.0.0
       - PORT=8000
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - BOOKING_AGENT_URL=http://booking-agent:9001/mcp
+      - PAYMENT_AGENT_URL=http://payment-agent:9002/mcp
+      - MCP_CONNECT_RETRIES=30
+      - MCP_CONNECT_DELAY=2.0
+      - STARTUP_DELAY=3
     ports:
       - "8000:8000"
     stdin_open: true
     tty: true
-    command: python agent.py
+    command: /app/startup.sh
+    depends_on:
+      booking-agent:
+        condition: service_healthy
+      payment-agent:
+        condition: service_healthy
 
 volumes:
   travel-postgres-data:
