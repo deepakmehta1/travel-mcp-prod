@@ -60,6 +60,7 @@ You: I want to book a travel tour. My phone number is +919999999999. I'm interes
 ```bash
 python agent/client.py --samples
 ```
+Sample set includes a payment-consent flow so you can see booking + fake payment working end-to-end.
 
 **Option C: Use cURL**
 ```bash

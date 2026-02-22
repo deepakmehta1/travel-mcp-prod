@@ -35,12 +35,11 @@ docker compose up agent
 **What you will see:**
 
 - Agent logs showing:
-  - Starting the server container
-  - Tools available from the MCP server
+  - Booking + payment MCP agents reachable
+  - Tools available from each MCP server
   - LLM reasoning and decision-making process
-  - Each tool call and its arguments
-  - Tool results being fed back to the LLM
-  - Final booking result after LLM reasoning
+  - Tool calls and results (lookup, search, book, payment)
+  - Final booking/payment result after LLM reasoning
 
 **How it works:**
 
