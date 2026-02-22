@@ -5,8 +5,8 @@ set -e
 
 echo "Agent startup beginning..."
 echo "Environment configuration:"
-echo "  BOOKING_AGENT_URL: ${BOOKING_AGENT_URL:-http://booking-agent:9001}"
-echo "  PAYMENT_AGENT_URL: ${PAYMENT_AGENT_URL:-http://payment-agent:9002}"
+echo "  BOOKING_AGENT_URL: ${BOOKING_AGENT_URL:-http://booking-agent:9001/mcp}"
+echo "  PAYMENT_AGENT_URL: ${PAYMENT_AGENT_URL:-http://payment-agent:9002/mcp}"
 echo "  MCP_CONNECT_RETRIES: ${MCP_CONNECT_RETRIES:-30}"
 echo "  MCP_CONNECT_DELAY: ${MCP_CONNECT_DELAY:-2.0}"
 
