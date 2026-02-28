@@ -46,15 +46,15 @@ def create_app() -> FastAPI:
         
         async def event_stream():
             async for chunk in app.state.service.stream_query(request.query):
-                yield f"data: {chunk}\n\n"  # SSE format for universal client support
+                yield f"{chunk}"  # SSE format for universal client support
         
         return StreamingResponse(
             event_stream(),
-            media_type="text/event-stream",  # Standard SSE MIME
+            media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # Nginx buffering disable
+                "X-Accel-Buffering": "no",
             },
         )
 

@@ -311,7 +311,7 @@ class AgentService:
 
         try:
             final = await task
-            delay = 0.05  # 50ms; tune as you like
+            delay = 0.02  # 20ms per character
             chunk_size = 1  # letter by letter
             for i in range(0, len(final), chunk_size):
                 yield final[i : i + chunk_size]

@@ -48,37 +48,12 @@ export class AgentClient {
       if (!res.body) throw new Error('No response body')
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
-      let buffer = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         if (!value) continue
-        buffer += decoder.decode(value, { stream: true })
-
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line) continue
-          if (line.startsWith('data:')) {
-            let payload = line.slice(5)
-            if (payload.startsWith(' ')) payload = payload.slice(1)
-            if (payload.length) yield payload
-          }
-        }
-
-        // If buffer currently holds a full data line without newline, process it
-        if (buffer.startsWith('data:') && !buffer.endsWith('\n')) {
-          // wait for next chunk to complete
-          continue
-        }
-      }
-
-      // Flush remaining buffered line
-      if (buffer.startsWith('data:')) {
-        let payload = buffer.slice(5)
-        if (payload.startsWith(' ')) payload = payload.slice(1)
-        if (payload.length) yield payload
+        const chunk = decoder.decode(value, { stream: true })
+        if (chunk.length) yield chunk
       }
     } catch (err) {
       // Fallback to non-streaming so UX still works
