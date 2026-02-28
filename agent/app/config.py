@@ -22,7 +22,7 @@ def load_settings() -> Settings:
 
     return Settings(
         openai_api_key=openai_api_key,
-        llm_model=os.getenv("LLM_MODEL", "gpt-4o"),
+        llm_model=os.getenv("LLM_MODEL", "gpt-4o-nano"),
         booking_agent_url=os.getenv("BOOKING_AGENT_URL", "http://booking-agent:9001/mcp"),
         payment_agent_url=os.getenv("PAYMENT_AGENT_URL", "http://payment-agent:9002/mcp"),
         mcp_connect_retries=int(os.getenv("MCP_CONNECT_RETRIES", "15")),

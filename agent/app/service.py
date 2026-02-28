@@ -24,6 +24,7 @@ class AgentService:
         self._llm_tools: list = []
         self._tool_routing: dict[str, tuple[ClientSession, str]] = {}
         self._conversation_history: list[dict] = []
+        self._last_assistant_content: str | None = None
 
     async def initialize(self):
         self._client = AsyncOpenAI(api_key=self.settings.openai_api_key)
@@ -193,6 +194,7 @@ class AgentService:
                     "final_message": (final_response[:200] if final_response else "No content")
                 },
             )
+            self._last_assistant_content = final_response
             return final_response
 
         self.logger.warning(
@@ -208,6 +210,7 @@ class AgentService:
                 "content": SYSTEM_PROMPT,
             }
         ]
+        self._last_assistant_content = None
 
     def conversation_info(self):
         user_turns = len([m for m in self._conversation_history if m.get("role") == "user"])
@@ -222,6 +225,101 @@ class AgentService:
 
     def health(self) -> HealthResponse:
         return HealthResponse(status="healthy", model=self.settings.llm_model)
+
+    async def get_hints(self) -> list[str]:
+        if not self._booking_session or not self._client:
+            return []
+
+        # fetch current tours to ground suggestions
+        try:
+            mcp_result = await self._booking_session.call_tool("searchTours", arguments={})
+            data = json.loads(mcp_result.content[0].text)
+            tours = data.get("tours", [])
+        except Exception as e:
+            self.logger.warning("Hint generation failed (tour fetch)", extra={"error": str(e)})
+            return []
+
+        if not tours:
+            return []
+
+        # get last user and assistant messages to tailor suggestions
+        last_user = None
+        for msg in reversed(self._conversation_history):
+            if msg.get("role") == "user":
+                last_user = msg.get("content")
+                break
+        last_assistant = self._last_assistant_content or ""
+
+        # Build a grounded prompt listing only tours we actually offer
+        tours_text = "\n".join(
+            f"- {t.get('name','')} (code {t.get('code','')}) to {t.get('destination','')}, price {t.get('price') or t.get('base_price')}"
+            for t in tours
+        )
+
+        prompt = [
+            {
+                "role": "system",
+                "content": (
+                    "You generate 2-3 short next-step suggestions for the user in a travel booking chat. "
+                    "Use ONLY the tours listed below. Do not invent destinations or services. "
+                    "Keep each suggestion under 80 characters, actionable, and relevant to the last exchange. "
+                    "Return ONLY a JSON array of strings, no prose. "
+                    "Tours available:\n"
+                    f"{tours_text}"
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Previous user message:\n{last_user or ''}\n\n"
+                    f"Last assistant reply:\n{last_assistant}"
+                ),
+            },
+        ]
+
+        try:
+            resp = await self._client.chat.completions.create(
+                model=self.settings.llm_model,
+                messages=prompt,
+                temperature=0.4,
+                max_tokens=150,
+            )
+            content = resp.choices[0].message.content or "[]"
+            hints = json.loads(content)
+            if isinstance(hints, list):
+                # keep unique and short
+                deduped = []
+                seen = set()
+                for h in hints:
+                    hs = str(h)[:120]
+                    if hs not in seen:
+                        deduped.append(hs)
+                seen.add(hs)
+            return deduped[:5]
+        except Exception as e:
+            self.logger.warning("Hint generation failed", extra={"error": str(e)})
+        return []
+
+    async def stream_query(self, user_query: str):
+        if not user_query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        if not self._client or not self._llm_tools:
+            raise RuntimeError("Agent not initialized")
+
+        # Kick off the full process in the background so we can stream early
+        task = asyncio.create_task(self.process_query(user_query))
+
+        try:
+            final = await task
+            delay = 0.05  # 50ms; tune as you like
+            chunk_size = 1  # letter by letter
+            for i in range(0, len(final), chunk_size):
+                yield final[i : i + chunk_size]
+                await asyncio.sleep(delay)  # non-blocking delay between chunks
+        except Exception as e:
+            self.logger.error("Streaming failed", extra={"error": str(e)})
+            yield "Sorry, streaming failed."
+
 
 
 async def process_query(service: AgentService, question: str) -> QueryResponse:

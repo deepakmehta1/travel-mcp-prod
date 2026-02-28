@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 
 from .config import load_settings
 from .logging_config import configure_logging, get_logger
@@ -38,10 +39,37 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="Query cannot be empty")
         return await process_query(app.state.service, request.query)
 
+    @app.post("/stream-query")
+    async def stream_query_endpoint(request: QueryRequest):
+        if not request.query or not request.query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+        async def event_stream():
+            async for chunk in app.state.service.stream_query(request.query):
+                yield f"data: {chunk}\n\n"  # SSE format for universal client support
+        
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",  # Standard SSE MIME
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Nginx buffering disable
+            },
+        )
+
+
     @app.post("/reset")
     async def reset_endpoint():
         app.state.service.reset()
         return {"success": True}
+
+    @app.get("/hints")
+    async def hints():
+        try:
+            return {"hints": await app.state.service.get_hints()}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/conversation-info")
     async def conversation_info():
