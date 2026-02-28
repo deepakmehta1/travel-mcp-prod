@@ -18,7 +18,10 @@ async def lifespan(app: FastAPI):
     app.state.service = service
 
     configure_logging()
-    logger.info("Starting FastAPI agent server", extra={"host": settings.host, "port": settings.port})
+    logger.info(
+        "Starting FastAPI agent server",
+        extra={"host": settings.host, "port": settings.port},
+    )
 
     await service.initialize()
     yield
@@ -43,11 +46,11 @@ def create_app() -> FastAPI:
     async def stream_query_endpoint(request: QueryRequest):
         if not request.query or not request.query.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
-        
+
         async def event_stream():
             async for chunk in app.state.service.stream_query(request.query):
                 yield f"{chunk}"  # SSE format for universal client support
-        
+
         return StreamingResponse(
             event_stream(),
             media_type="text/event-stream",
@@ -57,7 +60,6 @@ def create_app() -> FastAPI:
                 "X-Accel-Buffering": "no",
             },
         )
-
 
     @app.post("/reset")
     async def reset_endpoint():

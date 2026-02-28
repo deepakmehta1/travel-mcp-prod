@@ -32,7 +32,10 @@ def main() -> None:
     if transport == "streamable-http":
         host = os.getenv("MCP_HOST", "0.0.0.0")
         port = int(os.getenv("MCP_PORT", "9001"))
-        logger.info("Starting Travel MCP Server (streamable-http)", extra={"host": host, "port": port})
+        logger.info(
+            "Starting Travel MCP Server (streamable-http)",
+            extra={"host": host, "port": port},
+        )
         mcp.run(transport="streamable-http", host=host, port=port)
         return
     logger.info("Starting Travel MCP Server (stdio)")

@@ -41,7 +41,10 @@ def get_pool() -> ConnectionPool:
         )
         logger.info(
             "Postgres pool initialized",
-            extra={"min_size": settings.pool_min_size, "max_size": settings.pool_max_size},
+            extra={
+                "min_size": settings.pool_min_size,
+                "max_size": settings.pool_max_size,
+            },
         )
     return _pool
 

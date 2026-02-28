@@ -64,8 +64,20 @@ class AgentService:
         self._llm_tools = []
         self._tool_routing = {}
 
-        await register_tools("booking", self._booking_session, self._llm_tools, self._tool_routing, self.logger)
-        await register_tools("payment", self._payment_session, self._llm_tools, self._tool_routing, self.logger)
+        await register_tools(
+            "booking",
+            self._booking_session,
+            self._llm_tools,
+            self._tool_routing,
+            self.logger,
+        )
+        await register_tools(
+            "payment",
+            self._payment_session,
+            self._llm_tools,
+            self._tool_routing,
+            self.logger,
+        )
 
         self._conversation_history = [
             {
@@ -93,7 +105,10 @@ class AgentService:
         model = self.settings.llm_model
         self.logger.info(
             "Processing user query",
-            extra={"user_request": user_query, "conversation_turn": len(self._conversation_history)},
+            extra={
+                "user_request": user_query,
+                "conversation_turn": len(self._conversation_history),
+            },
         )
 
         self._conversation_history.append({"role": "user", "content": user_query})
@@ -158,7 +173,9 @@ class AgentService:
 
                     routing = self._tool_routing.get(tool_name)
                     if not routing:
-                        self.logger.warning("Unknown tool requested", extra={"tool_name": tool_name})
+                        self.logger.warning(
+                            "Unknown tool requested", extra={"tool_name": tool_name}
+                        )
                         result_data = {"error": "UNKNOWN_TOOL"}
                     else:
                         session, actual_tool_name = routing
@@ -191,7 +208,9 @@ class AgentService:
             self.logger.info(
                 "Agent completed reasoning",
                 extra={
-                    "final_message": (final_response[:200] if final_response else "No content")
+                    "final_message": (
+                        final_response[:200] if final_response else "No content"
+                    )
                 },
             )
             self._last_assistant_content = final_response
@@ -213,8 +232,12 @@ class AgentService:
         self._last_assistant_content = None
 
     def conversation_info(self):
-        user_turns = len([m for m in self._conversation_history if m.get("role") == "user"])
-        assistant_turns = len([m for m in self._conversation_history if m.get("role") == "assistant"])
+        user_turns = len(
+            [m for m in self._conversation_history if m.get("role") == "user"]
+        )
+        assistant_turns = len(
+            [m for m in self._conversation_history if m.get("role") == "assistant"]
+        )
         total_messages = len(self._conversation_history)
         return {
             "user_turns": user_turns,
@@ -232,11 +255,15 @@ class AgentService:
 
         # fetch current tours to ground suggestions
         try:
-            mcp_result = await self._booking_session.call_tool("searchTours", arguments={})
+            mcp_result = await self._booking_session.call_tool(
+                "searchTours", arguments={}
+            )
             data = json.loads(mcp_result.content[0].text)
             tours = data.get("tours", [])
         except Exception as e:
-            self.logger.warning("Hint generation failed (tour fetch)", extra={"error": str(e)})
+            self.logger.warning(
+                "Hint generation failed (tour fetch)", extra={"error": str(e)}
+            )
             return []
 
         if not tours:
@@ -319,7 +346,6 @@ class AgentService:
         except Exception as e:
             self.logger.error("Streaming failed", extra={"error": str(e)})
             yield "Sorry, streaming failed."
-
 
 
 async def process_query(service: AgentService, question: str) -> QueryResponse:

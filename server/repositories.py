@@ -75,7 +75,9 @@ def get_tour_by_code(tour_code: str) -> dict[str, Any] | None:
             }
 
 
-def search_tours(destination: str | None = None, budget: int | None = None) -> list[dict[str, Any]]:
+def search_tours(
+    destination: str | None = None, budget: int | None = None
+) -> list[dict[str, Any]]:
     filters = []
     params: list[Any] = []
     if destination:
