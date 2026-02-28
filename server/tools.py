@@ -48,7 +48,9 @@ def register_tools(mcp: FastMCP) -> None:
             req = LookupCustomerByPhoneRequest(phone=phone)
         except ValidationError as exc:
             logger.warning("Invalid request", extra={"errors": exc.errors()})
-            return LookupCustomerByPhoneResponse(found=False, error="INVALID_REQUEST").model_dump()
+            return LookupCustomerByPhoneResponse(
+                found=False, error="INVALID_REQUEST"
+            ).model_dump()
 
         logger.info("lookupCustomerByPhone called", extra={"phone": req.phone})
         customer = get_customer_by_phone(phone)
@@ -60,7 +62,9 @@ def register_tools(mcp: FastMCP) -> None:
         return response.model_dump()
 
     @mcp.tool()
-    def searchTours(destination: str | None = None, budget: int | None = None) -> Dict[str, Any]:
+    def searchTours(
+        destination: str | None = None, budget: int | None = None
+    ) -> Dict[str, Any]:
         try:
             req = SearchToursRequest(destination=destination, budget=budget)
         except ValidationError as exc:
@@ -104,7 +108,9 @@ def register_tools(mcp: FastMCP) -> None:
                 "Invalid date format",
                 extra={"start_date": start_date, "end_date": end_date},
             )
-            return BookTourResponse(success=False, error="INVALID_DATE_FORMAT").model_dump()
+            return BookTourResponse(
+                success=False, error="INVALID_DATE_FORMAT"
+            ).model_dump()
         except ValidationError as exc:
             logger.warning("Invalid request", extra={"errors": exc.errors()})
             return BookTourResponse(success=False, error="INVALID_REQUEST").model_dump()
@@ -122,7 +128,9 @@ def register_tools(mcp: FastMCP) -> None:
         customer = get_customer_by_id(req.customer_id)
         if not customer:
             logger.warning("Customer not found", extra={"customer_id": req.customer_id})
-            return BookTourResponse(success=False, error="CUSTOMER_NOT_FOUND").model_dump()
+            return BookTourResponse(
+                success=False, error="CUSTOMER_NOT_FOUND"
+            ).model_dump()
 
         tour = get_tour_by_code(req.tour_code)
         if not tour:

@@ -31,14 +31,24 @@ async def wait_for_tcp(url: str, retries: int, delay: float, logger, name: str):
             last_exc = exc
             logger.info(
                 "Waiting for MCP agent port",
-                extra={"agent": name, "host": host, "port": port, "attempt": attempt, "error": str(exc)},
+                extra={
+                    "agent": name,
+                    "host": host,
+                    "port": port,
+                    "attempt": attempt,
+                    "error": str(exc),
+                },
             )
             if attempt < retries:
                 await asyncio.sleep(delay)
-    raise RuntimeError(f"Timed out waiting for {name} MCP agent at {host}:{port}") from last_exc
+    raise RuntimeError(
+        f"Timed out waiting for {name} MCP agent at {host}:{port}"
+    ) from last_exc
 
 
-async def start_mcp_session(url: str, name: str, retries: int, delay: float, logger) -> Tuple[ClientSession, any]:
+async def start_mcp_session(
+    url: str, name: str, retries: int, delay: float, logger
+) -> Tuple[ClientSession, any]:
     url = normalize_mcp_url(url)
     await wait_for_tcp(url, retries, delay, logger, name)
 
@@ -47,20 +57,31 @@ async def start_mcp_session(url: str, name: str, retries: int, delay: float, log
         cm = streamable_http_client(url)
         entered = False
         try:
-            logger.info("Attempting MCP session initialization", extra={"agent": name, "url": url, "attempt": attempt})
+            logger.info(
+                "Attempting MCP session initialization",
+                extra={"agent": name, "url": url, "attempt": attempt},
+            )
             result = await cm.__aenter__()
             entered = True
             read, write = result[0], result[1]
             session = ClientSession(read, write)
             await session.__aenter__()
             await session.initialize()
-            logger.info("MCP session initialized successfully", extra={"agent": name, "url": url})
+            logger.info(
+                "MCP session initialized successfully",
+                extra={"agent": name, "url": url},
+            )
             return session, cm
         except Exception as exc:
             last_exc = exc
             logger.warning(
                 "MCP connect failed after port was reachable",
-                extra={"agent": name, "url": url, "attempt": attempt, "error": str(exc)},
+                extra={
+                    "agent": name,
+                    "url": url,
+                    "attempt": attempt,
+                    "error": str(exc),
+                },
             )
             if entered:
                 try:
@@ -71,14 +92,25 @@ async def start_mcp_session(url: str, name: str, retries: int, delay: float, log
                 try:
                     await asyncio.sleep(delay)
                 except asyncio.CancelledError:
-                    logger.warning("Startup was cancelled while waiting to retry MCP connection", extra={"agent": name})
+                    logger.warning(
+                        "Startup was cancelled while waiting to retry MCP connection",
+                        extra={"agent": name},
+                    )
                     raise
     raise RuntimeError(f"Failed to connect to {name} MCP agent at {url}") from last_exc
 
 
-async def register_tools(prefix: str, session: Optional[ClientSession], llm_tools: list, tool_routing: dict, logger):
+async def register_tools(
+    prefix: str,
+    session: Optional[ClientSession],
+    llm_tools: list,
+    tool_routing: dict,
+    logger,
+):
     if session is None:
-        logger.warning("Session not available for tools registration", extra={"prefix": prefix})
+        logger.warning(
+            "Session not available for tools registration", extra={"prefix": prefix}
+        )
         return
 
     tools_response = await session.list_tools()
