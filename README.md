@@ -11,6 +11,7 @@ The agent has been upgraded to use an LLM with prompts to intelligently decide w
 - Optionally set `LLM_MODEL` to specify which model to use (defaults to `gpt-4o`)
 - Postgres database available for the MCP server
 - Booking and payment MCP agents reachable over HTTP
+- (Optional) React frontend at `frontend/` for a conversational UI
 
 **Running the agent:**
 
@@ -56,8 +57,9 @@ docker compose up agent
 - `LLM_MODEL`: Optional. LLM model to use (default: `gpt-4o`)
 - `DATABASE_URL`: Required for Postgres. Connection string used by the MCP server
 - `MCP_SERVER_DOCKER_NETWORK`: Optional. Docker network for the MCP server container (needed to reach `travel-postgres`)
-- `BOOKING_AGENT_URL`: Booking agent MCP endpoint (default: `http://booking-agent:9001`)
-- `PAYMENT_AGENT_URL`: Payment agent MCP endpoint (default: `http://payment-agent:9002`)
+- `BOOKING_AGENT_URL`: Booking agent MCP endpoint (default: `http://booking-agent:9001/mcp`)
+- `PAYMENT_AGENT_URL`: Payment agent MCP endpoint (default: `http://payment-agent:9002/mcp`)
+- `VITE_AGENT_URL`: (frontend) FastAPI agent endpoint (default: `http://localhost:8000`)
 
 ---
 
