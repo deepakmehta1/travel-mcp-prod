@@ -1,6 +1,9 @@
 import React from "react";
+import { useAuth } from "../context/AuthContext";
 
 export function Header() {
+  const { user, logout } = useAuth();
+
   return (
     <header
       style={{
@@ -46,6 +49,32 @@ export function Header() {
         >
           Live
         </span>
+        {user && (
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ color: "#0b1224" }}>{user.email}</span>
+            <button
+              onClick={logout}
+              style={{
+                background: "#0b1224",
+                color: "#22d3ee",
+                padding: "6px 10px",
+                borderRadius: "10px",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: "12px",
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

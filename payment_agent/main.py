@@ -78,7 +78,10 @@ def main() -> None:
     port = int(os.getenv("MCP_PORT", "9002"))
 
     if transport == "streamable-http":
-        logger.info("Starting Payment Agent MCP Server", extra={"host": host, "port": port, "transport": "streamable-http"})
+        logger.info(
+            "Starting Payment Agent MCP Server",
+            extra={"host": host, "port": port, "transport": "streamable-http"},
+        )
         mcp.run(transport="streamable-http", host=host, port=port)
     else:
         logger.info("Starting Payment Agent MCP Server (stdio mode)")

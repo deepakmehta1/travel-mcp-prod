@@ -3,6 +3,9 @@ import { AgentClient, Message } from "./api/client";
 import { Header } from "./components/Header";
 import { MessageList } from "./components/MessageList";
 import { Composer } from "./components/Composer";
+import { Login } from "./components/Login";
+import { Register } from "./components/Register";
+import { useAuth } from "./context/AuthContext";
 
 const presetIntro: Message = {
   role: "assistant",
@@ -10,8 +13,8 @@ const presetIntro: Message = {
     "Hi! I'm your travel concierge. Tell me where you want to go, your budget, and if you're ready to consent to payment when we find the right option.",
 };
 
-function useAgentClient() {
-  return useMemo(() => new AgentClient(), []);
+function useAgentClient(token: string | null) {
+  return useMemo(() => new AgentClient(undefined, token), [token]);
 }
 
 function useConversation() {
@@ -21,8 +24,8 @@ function useConversation() {
   return { messages, setMessages, loading, setLoading, error, setError };
 }
 
-export default function App() {
-  const client = useAgentClient();
+function ChatInterface({ token }: { token: string | null }) {
+  const client = useAgentClient(token);
   const { messages, setMessages, loading, setLoading, error, setError } =
     useConversation();
 
@@ -158,4 +161,50 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const { user, loading } = useAuth();
+  const [authView, setAuthView] = useState<"login" | "register">("login");
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background:
+            "radial-gradient(circle at 10% 20%, rgba(34,211,238,0.08), transparent 25%), radial-gradient(circle at 90% 10%, rgba(14,165,233,0.12), transparent 22%), #0b1224",
+          color: "#e2e8f0",
+        }}
+      >
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background:
+            "radial-gradient(circle at 10% 20%, rgba(34,211,238,0.08), transparent 25%), radial-gradient(circle at 90% 10%, rgba(14,165,233,0.12), transparent 22%), #0b1224",
+          color: "#e2e8f0",
+          fontFamily:
+            'Inter, "SF Pro Display", system-ui, -apple-system, sans-serif',
+        }}
+      >
+        {authView === "login" ? (
+          <Login onSwitchToRegister={() => setAuthView("register")} />
+        ) : (
+          <Register onSwitchToLogin={() => setAuthView("login")} />
+        )}
+      </div>
+    );
+  }
+
+  return <ChatInterface token={user.token} />;
 }
