@@ -26,6 +26,12 @@ SEED_TOURS = [
     ("PUN-3D2N-FOOD", "Pune 3D/2N – Food & History", 19000, 2, "Pune"),
     ("HYD-4D3N-CHAR", "Hyderabad 4D/3N – Charminar & Biryani", 23000, 3, "Hyderabad"),
 ]
+SEED_USER = {
+    "name": "John Doe",
+    "email": "john.doe@test.com",
+    "phone": "+919999999999",
+    "password": "Test@321",
+}
 
 
 def get_pool() -> ConnectionPool:
@@ -103,6 +109,68 @@ def init_db() -> None:
                         Json({"hotel_rating": "3-4", "meal": "non-veg"}),
                     ),
                 )
+            # Ensure seed user exists in users/customers for demo bookings
+            cur.execute(
+                "SELECT id, password_hash FROM users WHERE LOWER(email) = LOWER(%s)",
+                (SEED_USER["email"],),
+            )
+            user_row = cur.fetchone()
+            if not user_row:
+                from .repositories import _hash_password
+
+                password_hash = _hash_password(SEED_USER["password"])
+                cur.execute(
+                    """
+                    INSERT INTO users (name, email, phone, password_hash)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (email) DO NOTHING
+                    """,
+                    (
+                        SEED_USER["name"],
+                        SEED_USER["email"],
+                        SEED_USER["phone"],
+                        password_hash,
+                    ),
+                )
+            else:
+                # Ensure demo password is set for login
+                from .repositories import _hash_password
+
+                password_hash = _hash_password(SEED_USER["password"])
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET name = %s, phone = %s, password_hash = %s
+                    WHERE LOWER(email) = LOWER(%s)
+                    """,
+                    (
+                        SEED_USER["name"],
+                        SEED_USER["phone"],
+                        password_hash,
+                        SEED_USER["email"],
+                    ),
+                )
+            cur.execute(
+                "SELECT id FROM customers WHERE phone = %s", (SEED_USER["phone"],)
+            )
+            if not cur.fetchone():
+                cur.execute(
+                    """
+                    INSERT INTO customers (name, email, phone, preferences)
+                    VALUES (%s, %s, %s, '{}'::jsonb)
+                    ON CONFLICT (phone) DO NOTHING
+                    """,
+                    (SEED_USER["name"], SEED_USER["email"], SEED_USER["phone"]),
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE customers
+                    SET name = %s, email = %s
+                    WHERE phone = %s
+                    """,
+                    (SEED_USER["name"], SEED_USER["email"], SEED_USER["phone"]),
+                )
             cur.execute("SELECT COUNT(*) AS count FROM tours")
             tours_count = cur.fetchone()[0]
             if tours_count < len(SEED_TOURS):
@@ -114,3 +182,43 @@ def init_db() -> None:
                     """,
                     SEED_TOURS,
                 )
+            # Seed a demo booking if none exists for the seed user
+            cur.execute(
+                "SELECT id FROM customers WHERE phone = %s", (SEED_USER["phone"],)
+            )
+            row = cur.fetchone()
+            if row:
+                customer_id = row[0]
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM bookings
+                    WHERE customer_id = %s AND tour_code = %s
+                    """,
+                    (customer_id, "GOA-5D4N-OPT2"),
+                )
+                booking_count = cur.fetchone()[0]
+                if booking_count == 0:
+                    cur.execute(
+                        "SELECT base_price FROM tours WHERE code = %s",
+                        ("GOA-5D4N-OPT2",),
+                    )
+                    price_row = cur.fetchone()
+                    if price_row:
+                        from datetime import date, timedelta
+
+                        start_date = date.today() + timedelta(days=30)
+                        end_date = start_date + timedelta(days=4)
+                        cur.execute(
+                            """
+                            INSERT INTO bookings (customer_id, tour_code, start_date, end_date, total_price, status)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                customer_id,
+                                "GOA-5D4N-OPT2",
+                                start_date,
+                                end_date,
+                                price_row[0],
+                                "CONFIRMED",
+                            ),
+                        )
