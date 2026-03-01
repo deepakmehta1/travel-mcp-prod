@@ -10,6 +10,8 @@ try:
         AuthUserModel,
         BookTourRequest,
         BookTourResponse,
+        CustomerContextRequest,
+        CustomerContextResponse,
         LoginUserRequest,
         LoginUserResponse,
         LookupCustomerByPhoneRequest,
@@ -34,6 +36,8 @@ except ImportError:
         AuthUserModel,
         BookTourRequest,
         BookTourResponse,
+        CustomerContextRequest,
+        CustomerContextResponse,
         LoginUserRequest,
         LoginUserResponse,
         LookupCustomerByPhoneRequest,
@@ -125,6 +129,32 @@ def register_tools(mcp: FastMCP) -> None:
         logger.info("Customer found", extra={"customer_id": customer["id"]})
         response = LookupCustomerByPhoneResponse(found=True, customer=customer)
         return response.model_dump()
+
+    @mcp.tool()
+    def getCustomerContext(phone: str) -> Dict[str, Any]:
+        try:
+            req = CustomerContextRequest(phone=phone)
+        except ValidationError as exc:
+            logger.warning("Invalid request", extra={"errors": exc.errors()})
+            return CustomerContextResponse(
+                found=False, message="INVALID_REQUEST"
+            ).model_dump()
+
+        customer = get_customer_by_phone(req.phone)
+        if not customer:
+            return CustomerContextResponse(
+                found=False,
+                message=(
+                    "I couldn't find a profile for that number yet. "
+                    "If you'd like, I can create one."
+                ),
+            ).model_dump()
+
+        return CustomerContextResponse(
+            found=True,
+            customer=customer,
+            message="Here is what I have on file.",
+        ).model_dump()
 
     @mcp.tool()
     def searchTours(

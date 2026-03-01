@@ -108,3 +108,23 @@ class LoginUserResponse(BaseModel):
     success: bool
     user: AuthUserModel | None = None
     error: str | None = None
+
+
+class CustomerContextRequest(BaseModel):
+    phone: str = Field(min_length=3)
+
+
+class CustomerContextResponse(BaseModel):
+    found: bool
+    customer: CustomerModel | None = None
+    message: str | None = None
+
+
+class CustomerContextRequest(BaseModel):
+    phone: str = Field(min_length=3)
+
+
+class CustomerContextResponse(BaseModel):
+    found: bool
+    customer: CustomerModel | None = None
+    message: str | None = None

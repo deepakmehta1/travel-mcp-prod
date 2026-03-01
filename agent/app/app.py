@@ -99,6 +99,7 @@ def create_app() -> FastAPI:
     ):
         if not request.query or not request.query.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
+        await app.state.service.set_auth_context(current_user)
         return await process_query(app.state.service, request.query)
 
     @app.post("/stream-query")
@@ -107,6 +108,7 @@ def create_app() -> FastAPI:
     ):
         if not request.query or not request.query.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
+        await app.state.service.set_auth_context(current_user)
 
         async def event_stream():
             async for chunk in app.state.service.stream_query(request.query):
