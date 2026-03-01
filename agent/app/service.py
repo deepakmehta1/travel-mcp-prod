@@ -25,6 +25,8 @@ class AgentService:
         self._tool_routing: dict[str, tuple[ClientSession, str]] = {}
         self._conversation_history: list[dict] = []
         self._last_assistant_content: str | None = None
+        self._auth_context: dict | None = None
+        self._auth_context_loaded: bool = False
 
     async def initialize(self):
         self._client = AsyncOpenAI(api_key=self.settings.openai_api_key)
@@ -85,6 +87,8 @@ class AgentService:
                 "content": SYSTEM_PROMPT,
             }
         ]
+        self._auth_context = None
+        self._auth_context_loaded = False
 
     async def shutdown(self):
         if self._booking_session:
@@ -230,6 +234,40 @@ class AgentService:
             }
         ]
         self._last_assistant_content = None
+        self._auth_context_loaded = False
+
+    async def set_auth_context(self, payload: dict):
+        if not payload:
+            return
+        if self._auth_context_loaded and self._auth_context == payload:
+            return
+        self._auth_context = payload
+        self._auth_context_loaded = True
+        phone = payload.get("phone")
+        email = payload.get("email")
+        if not phone or not self._booking_session:
+            return
+        try:
+            result = await self._booking_session.call_tool(
+                "getCustomerContext",
+                arguments={"phone": phone},
+            )
+            data = json.loads(result.content[0].text)
+        except Exception:
+            data = {"found": False}
+        # Inject a system context note for the LLM
+        if data.get("found") and data.get("customer"):
+            customer = data["customer"]
+            context = (
+                f"Authenticated user context: name={customer.get('name')}, "
+                f"phone={customer.get('phone')}, email={customer.get('email')}."
+            )
+        else:
+            context = (
+                f"Authenticated user context: email={email}, phone={phone}. "
+                "No customer profile found yet."
+            )
+        self._conversation_history.append({"role": "system", "content": context})
 
     def conversation_info(self):
         user_turns = len(
