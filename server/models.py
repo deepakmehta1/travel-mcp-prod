@@ -120,6 +120,27 @@ class CustomerContextResponse(BaseModel):
     message: str | None = None
 
 
+class BookingSummaryModel(BaseModel):
+    id: int
+    tour_code: str
+    tour_name: str
+    destination: str
+    start_date: date
+    end_date: date
+    total_price: int
+    status: str
+
+
+class ListBookingsRequest(BaseModel):
+    phone: str = Field(min_length=3)
+
+
+class ListBookingsResponse(BaseModel):
+    success: bool
+    bookings: list[BookingSummaryModel] | None = None
+    error: str | None = None
+
+
 class CustomerContextRequest(BaseModel):
     phone: str = Field(min_length=3)
 

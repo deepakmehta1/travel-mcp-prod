@@ -10,8 +10,11 @@ try:
         AuthUserModel,
         BookTourRequest,
         BookTourResponse,
+        BookingSummaryModel,
         CustomerContextRequest,
         CustomerContextResponse,
+        ListBookingsRequest,
+        ListBookingsResponse,
         LoginUserRequest,
         LoginUserResponse,
         LookupCustomerByPhoneRequest,
@@ -31,13 +34,17 @@ try:
         get_user_by_email,
         search_tours,
     )
+    from .bookings import list_bookings_by_phone
 except ImportError:
     from models import (
         AuthUserModel,
         BookTourRequest,
         BookTourResponse,
+        BookingSummaryModel,
         CustomerContextRequest,
         CustomerContextResponse,
+        ListBookingsRequest,
+        ListBookingsResponse,
         LoginUserRequest,
         LoginUserResponse,
         LookupCustomerByPhoneRequest,
@@ -57,6 +64,7 @@ except ImportError:
         get_user_by_email,
         search_tours,
     )
+    from bookings import list_bookings_by_phone
 
 logger = logging.getLogger("server")
 
@@ -154,6 +162,25 @@ def register_tools(mcp: FastMCP) -> None:
             found=True,
             customer=customer,
             message="Here is what I have on file.",
+        ).model_dump()
+
+    @mcp.tool()
+    def listBookings(phone: str) -> Dict[str, Any]:
+        try:
+            req = ListBookingsRequest(phone=phone)
+        except ValidationError as exc:
+            logger.warning("Invalid request", extra={"errors": exc.errors()})
+            return ListBookingsResponse(
+                success=False, error="INVALID_REQUEST"
+            ).model_dump()
+
+        bookings = list_bookings_by_phone(req.phone)
+        if not bookings:
+            return ListBookingsResponse(success=True, bookings=[]).model_dump()
+
+        return ListBookingsResponse(
+            success=True,
+            bookings=[BookingSummaryModel(**b) for b in bookings],
         ).model_dump()
 
     @mcp.tool()

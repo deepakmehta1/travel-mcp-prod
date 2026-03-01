@@ -3,6 +3,7 @@ import { AgentClient, Message } from "./api/client";
 import { Header } from "./components/Header";
 import { MessageList } from "./components/MessageList";
 import { Composer } from "./components/Composer";
+import { LaunchCards } from "./components/LaunchCards";
 import { Login } from "./components/Login";
 import { Register } from "./components/Register";
 import { useAuth } from "./context/AuthContext";
@@ -130,6 +131,7 @@ function ChatInterface({ token }: { token: string | null }) {
             </div>
           )}
           <MessageList messages={messages} />
+          <LaunchCards onSend={send} disabled={loading} />
           <div
             style={{
               display: "flex",
