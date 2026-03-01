@@ -2,32 +2,25 @@ import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<"details" | "verify">("details");
   const { register } = useAuth();
 
-  const handleSubmitDetails = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!email || !phone) {
+    if (!name || !email || !phone || !password) {
       setError("Please fill in all fields");
       return;
     }
-    // Move to verification step
-    setStep("verify");
-  };
-
-  const handleSubmitVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
     setLoading(true);
 
     try {
-      await register(email, phone, verificationCode);
+      await register(name, email, phone, password);
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
@@ -74,16 +67,42 @@ export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             marginBottom: "24px",
           }}
         >
-          {step === "details"
-            ? "Sign up to start booking travels"
-            : "Verify your information"}
+          Sign up to start booking travels
         </p>
 
-        {step === "details" ? (
-          <form
-            onSubmit={handleSubmitDetails}
-            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-          >
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
+          <div>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                fontSize: "14px",
+                fontWeight: 600,
+              }}
+            >
+              Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                background: "#0f1419",
+                border: "1px solid #1e293b",
+                borderRadius: "8px",
+                color: "#e2e8f0",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+              placeholder="Your full name"
+            />
+          </div>
+
             <div>
               <label
                 style={{
@@ -142,65 +161,6 @@ export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
               />
             </div>
 
-            {error && (
-              <div
-                style={{
-                  padding: "10px",
-                  background: "#7f1d1d",
-                  border: "1px solid #d32f2f",
-                  borderRadius: "8px",
-                  color: "#fecdd3",
-                  fontSize: "14px",
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              style={{
-                padding: "12px",
-                background: "linear-gradient(135deg, #0ea5e9, #22d3ee)",
-                color: "#0b1224",
-                border: "none",
-                borderRadius: "8px",
-                fontWeight: 600,
-                fontSize: "14px",
-                cursor: "pointer",
-              }}
-            >
-              Continue
-            </button>
-          </form>
-        ) : (
-          <form
-            onSubmit={handleSubmitVerification}
-            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-          >
-            <div
-              style={{
-                background: "#0f1419",
-                padding: "12px",
-                borderRadius: "8px",
-                marginBottom: "8px",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "#94a3b8",
-                  margin: "0 0 8px 0",
-                }}
-              >
-                Verification code has been sent to your email and phone
-              </p>
-              <p style={{ fontSize: "12px", color: "#64748b", margin: "0" }}>
-                For demo purposes, the verification code is:{" "}
-                <strong>1234</strong>
-              </p>
-            </div>
-
             <div>
               <label
                 style={{
@@ -210,13 +170,12 @@ export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                   fontWeight: 600,
                 }}
               >
-                Verification Code
+                Password
               </label>
               <input
-                type="text"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value)}
-                maxLength={4}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 style={{
                   width: "100%",
                   padding: "10px 12px",
@@ -226,10 +185,8 @@ export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                   color: "#e2e8f0",
                   fontSize: "14px",
                   boxSizing: "border-box",
-                  textAlign: "center",
-                  letterSpacing: "4px",
                 }}
-                placeholder="0000"
+                placeholder="••••••••"
               />
             </div>
 
@@ -260,30 +217,12 @@ export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 fontWeight: 600,
                 fontSize: "14px",
                 cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.5 : 1,
-              }}
-            >
-              {loading ? "Verifying..." : "Verify & Register"}
+              opacity: loading ? 0.5 : 1,
+            }}
+          >
+              {loading ? "Registering..." : "Create Account"}
             </button>
-
-            <button
-              type="button"
-              onClick={() => setStep("details")}
-              style={{
-                padding: "10px",
-                background: "transparent",
-                color: "#22d3ee",
-                border: "1px solid #22d3ee",
-                borderRadius: "8px",
-                fontWeight: 600,
-                fontSize: "14px",
-                cursor: "pointer",
-              }}
-            >
-              Back
-            </button>
-          </form>
-        )}
+        </form>
 
         <div
           style={{

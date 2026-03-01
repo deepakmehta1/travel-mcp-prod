@@ -61,22 +61,37 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=400, detail="Email and password are required"
             )
-        # For demo purposes, accept any email/password combination
-        token = create_access_token(request.email, "")
-        return AuthResponse(email=request.email, phone="", token=token)
+        result = await app.state.service.login_user(request.email, request.password)
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=401, detail=result.get("error", "LOGIN_FAILED")
+            )
+        user = result["user"]
+        token = create_access_token(user["email"], user["phone"])
+        return AuthResponse(email=user["email"], phone=user["phone"], token=token)
 
     @app.post("/auth/register", response_model=AuthResponse)
     async def register_endpoint(request: RegisterRequest):
-        if not request.email or not request.phone or not request.verification_code:
+        if (
+            not request.name
+            or not request.email
+            or not request.phone
+            or not request.password
+        ):
             raise HTTPException(
                 status_code=400,
-                detail="Email, phone, and verification code are required",
+                detail="Name, email, phone, and password are required",
             )
-        # For demo purposes, accept hardcoded verification code 1234
-        if request.verification_code != "1234":
-            raise HTTPException(status_code=400, detail="Invalid verification code")
-        token = create_access_token(request.email, request.phone)
-        return AuthResponse(email=request.email, phone=request.phone, token=token)
+        result = await app.state.service.register_user(
+            request.name, request.email, request.phone, request.password
+        )
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=400, detail=result.get("error", "REGISTER_FAILED")
+            )
+        user = result["user"]
+        token = create_access_token(user["email"], user["phone"])
+        return AuthResponse(email=user["email"], phone=user["phone"], token=token)
 
     @app.post("/query", response_model=QueryResponse)
     async def query_endpoint(

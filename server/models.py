@@ -77,3 +77,34 @@ class BookTourResponse(BaseModel):
     success: bool
     booking: BookingModel | None = None
     error: str | None = None
+
+
+class RegisterUserRequest(BaseModel):
+    name: str = Field(min_length=2)
+    email: EmailStr
+    phone: str = Field(min_length=3)
+    password: str = Field(min_length=6)
+
+
+class LoginUserRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+
+
+class AuthUserModel(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    phone: str
+
+
+class RegisterUserResponse(BaseModel):
+    success: bool
+    user: AuthUserModel | None = None
+    error: str | None = None
+
+
+class LoginUserResponse(BaseModel):
+    success: bool
+    user: AuthUserModel | None = None
+    error: str | None = None

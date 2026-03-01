@@ -23,9 +23,10 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
+    name: str
     email: str
     phone: str
-    verification_code: str
+    password: str
 
 
 class AuthResponse(BaseModel):
