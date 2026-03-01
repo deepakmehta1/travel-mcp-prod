@@ -17,6 +17,24 @@ class HealthResponse(BaseModel):
     model: str
 
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    email: str
+    phone: str
+    token: str
+
+
 RESERVED_LOG_ATTRS = {
     "name",
     "msg",

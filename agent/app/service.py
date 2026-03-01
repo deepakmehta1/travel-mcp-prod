@@ -321,7 +321,7 @@ class AgentService:
                     hs = str(h)[:120]
                     if hs not in seen:
                         deduped.append(hs)
-                seen.add(hs)
+                        seen.add(hs)
             return deduped[:5]
         except Exception as e:
             self.logger.warning("Hint generation failed", extra={"error": str(e)})
@@ -346,6 +346,31 @@ class AgentService:
         except Exception as e:
             self.logger.error("Streaming failed", extra={"error": str(e)})
             yield "Sorry, streaming failed."
+
+    async def register_user(
+        self, name: str, email: str, phone: str, password: str
+    ) -> dict:
+        if not self._booking_session:
+            raise RuntimeError("Booking agent unavailable")
+        result = await self._booking_session.call_tool(
+            "registerUser",
+            arguments={
+                "name": name,
+                "email": email,
+                "phone": phone,
+                "password": password,
+            },
+        )
+        return json.loads(result.content[0].text)
+
+    async def login_user(self, email: str, password: str) -> dict:
+        if not self._booking_session:
+            raise RuntimeError("Booking agent unavailable")
+        result = await self._booking_session.call_tool(
+            "loginUser",
+            arguments={"email": email, "password": password},
+        )
+        return json.loads(result.content[0].text)
 
 
 async def process_query(service: AgentService, question: str) -> QueryResponse:

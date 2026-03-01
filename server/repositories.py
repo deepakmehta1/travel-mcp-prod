@@ -1,3 +1,5 @@
+import hashlib
+import os
 from typing import Any
 
 try:
@@ -148,4 +150,89 @@ def create_booking(
         "end_date": row[4].isoformat() if hasattr(row[4], "isoformat") else row[4],
         "total_price": row[5],
         "status": row[6],
+    }
+
+
+def _hash_password(password: str, salt: str | None = None) -> str:
+    salt = salt or os.urandom(16).hex()
+    iterations = 120000
+    dk = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations
+    )
+    return f"pbkdf2_sha256${iterations}${salt}${dk.hex()}"
+
+
+def _verify_password(password: str, encoded: str) -> bool:
+    try:
+        algo, iter_str, salt, digest = encoded.split("$", 3)
+        if algo != "pbkdf2_sha256":
+            return False
+        iterations = int(iter_str)
+        dk = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations
+        )
+        return dk.hex() == digest
+    except Exception:
+        return False
+
+
+def get_user_by_email(email: str) -> dict[str, Any] | None:
+    with get_pool().connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, name, email, phone, password_hash
+                FROM users
+                WHERE LOWER(email) = LOWER(%s)
+                """,
+                (email,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {
+                "id": row[0],
+                "name": row[1],
+                "email": row[2],
+                "phone": row[3],
+                "password_hash": row[4],
+            }
+
+
+def create_user(name: str, email: str, phone: str, password: str) -> dict[str, Any]:
+    password_hash = _hash_password(password)
+    with get_pool().connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users (name, email, phone, password_hash)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id, name, email, phone
+                """,
+                (name, email, phone, password_hash),
+            )
+            row = cur.fetchone()
+            # keep customers table aligned for booking flows
+            cur.execute(
+                """
+                INSERT INTO customers (name, email, phone, preferences)
+                VALUES (%s, %s, %s, '{}'::jsonb)
+                ON CONFLICT (phone) DO NOTHING
+                """,
+                (name, email, phone),
+            )
+    return {"id": row[0], "name": row[1], "email": row[2], "phone": row[3]}
+
+
+def authenticate_user(email: str, password: str) -> dict[str, Any] | None:
+    user = get_user_by_email(email)
+    if not user:
+        return None
+    if not _verify_password(password, user["password_hash"]):
+        return None
+    return {
+        "id": user["id"],
+        "name": user["name"],
+        "email": user["email"],
+        "phone": user["phone"],
     }

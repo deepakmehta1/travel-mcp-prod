@@ -7,34 +7,50 @@ from pydantic import ValidationError
 
 try:
     from .models import (
+        AuthUserModel,
         BookTourRequest,
         BookTourResponse,
+        LoginUserRequest,
+        LoginUserResponse,
         LookupCustomerByPhoneRequest,
         LookupCustomerByPhoneResponse,
+        RegisterUserRequest,
+        RegisterUserResponse,
         SearchToursRequest,
         SearchToursResponse,
     )
     from .repositories import (
+        authenticate_user,
+        create_user,
         create_booking,
         get_customer_by_id,
         get_customer_by_phone,
         get_tour_by_code,
+        get_user_by_email,
         search_tours,
     )
 except ImportError:
     from models import (
+        AuthUserModel,
         BookTourRequest,
         BookTourResponse,
+        LoginUserRequest,
+        LoginUserResponse,
         LookupCustomerByPhoneRequest,
         LookupCustomerByPhoneResponse,
+        RegisterUserRequest,
+        RegisterUserResponse,
         SearchToursRequest,
         SearchToursResponse,
     )
     from repositories import (
+        authenticate_user,
+        create_user,
         create_booking,
         get_customer_by_id,
         get_customer_by_phone,
         get_tour_by_code,
+        get_user_by_email,
         search_tours,
     )
 
@@ -42,6 +58,55 @@ logger = logging.getLogger("server")
 
 
 def register_tools(mcp: FastMCP) -> None:
+    @mcp.tool()
+    def registerUser(
+        name: str, email: str, phone: str, password: str
+    ) -> Dict[str, Any]:
+        try:
+            req = RegisterUserRequest(
+                name=name, email=email, phone=phone, password=password
+            )
+        except ValidationError as exc:
+            logger.warning(
+                "Invalid registerUser request", extra={"errors": exc.errors()}
+            )
+            return RegisterUserResponse(
+                success=False, error="INVALID_REQUEST"
+            ).model_dump()
+
+        if get_user_by_email(req.email):
+            return RegisterUserResponse(
+                success=False, error="EMAIL_ALREADY_EXISTS"
+            ).model_dump()
+
+        try:
+            user = create_user(req.name, req.email, req.phone, req.password)
+            return RegisterUserResponse(
+                success=True, user=AuthUserModel(**user)
+            ).model_dump()
+        except Exception:
+            logger.exception("registerUser failed")
+            return RegisterUserResponse(
+                success=False, error="REGISTER_FAILED"
+            ).model_dump()
+
+    @mcp.tool()
+    def loginUser(email: str, password: str) -> Dict[str, Any]:
+        try:
+            req = LoginUserRequest(email=email, password=password)
+        except ValidationError as exc:
+            logger.warning("Invalid loginUser request", extra={"errors": exc.errors()})
+            return LoginUserResponse(
+                success=False, error="INVALID_REQUEST"
+            ).model_dump()
+
+        user = authenticate_user(req.email, req.password)
+        if not user:
+            return LoginUserResponse(
+                success=False, error="INVALID_CREDENTIALS"
+            ).model_dump()
+        return LoginUserResponse(success=True, user=AuthUserModel(**user)).model_dump()
+
     @mcp.tool()
     def lookupCustomerByPhone(phone: str) -> Dict[str, Any]:
         try:

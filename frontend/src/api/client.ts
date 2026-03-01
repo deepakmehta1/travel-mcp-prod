@@ -14,15 +14,30 @@ export type QueryResponse = {
 
 export class AgentClient {
   readonly baseUrl: string;
+  readonly token: string | null;
 
-  constructor(baseUrl: string = DEFAULT_AGENT_URL) {
+  constructor(
+    baseUrl: string = DEFAULT_AGENT_URL,
+    token: string | null = null,
+  ) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.token = token;
+  }
+
+  private getAuthHeaders() {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+    return headers;
   }
 
   async sendQuery(query: string): Promise<QueryResponse> {
     const res = await fetch(`${this.baseUrl}/query`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify({ query }),
     });
     if (!res.ok) {
@@ -33,14 +48,17 @@ export class AgentClient {
   }
 
   async reset(): Promise<void> {
-    await fetch(`${this.baseUrl}/reset`, { method: "POST" });
+    await fetch(`${this.baseUrl}/reset`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+    });
   }
 
   async *streamQuery(query: string): AsyncGenerator<string, void, void> {
     try {
       const res = await fetch(`${this.baseUrl}/stream-query`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({ query }),
       });
       if (!res.ok) {
