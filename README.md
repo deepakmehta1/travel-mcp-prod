@@ -1,5 +1,12 @@
 # travel-mcp-prod
 
+## Project Components
+
+This project includes two main applications:
+
+1. **Customer Agent & Frontend**: Travel booking interface for customers with AI-powered concierge
+2. **Admin Panel**: Management interface for company executives to view bookings, customers, tours, and analytics
+
 ## How to run and see the flow
 
 ### LLM-Based Agent (Now using reasoning to decide on tools)
@@ -60,6 +67,44 @@ docker compose up agent
 - `BOOKING_AGENT_URL`: Booking agent MCP endpoint (default: `http://booking-agent:9001/mcp`)
 - `PAYMENT_AGENT_URL`: Payment agent MCP endpoint (default: `http://payment-agent:9002/mcp`)
 - `VITE_AGENT_URL`: (frontend) FastAPI agent endpoint (default: `http://localhost:8000`)
+
+---
+
+## Admin Panel
+
+The admin panel provides company executives with an AI-powered interface to manage and analyze the travel booking system. See [ADMIN_GUIDE.md](./ADMIN_GUIDE.md) for detailed documentation.
+
+**Quick Start:**
+
+```bash
+# Build all services
+docker compose build
+
+# Start admin panel (assumes postgres is already running)
+docker compose up admin-server admin-agent admin-frontend
+
+# Access at: http://localhost:3001
+```
+
+**Features:**
+- 📊 Dashboard with key metrics
+- 💬 AI-powered chat assistant for natural language queries
+- 📋 Booking management and status updates
+- 👥 Customer analytics and insights
+- 🌍 Tour performance analysis
+- 💰 Revenue reports and analytics
+
+**Example Queries:**
+- "Show me all bookings from last month"
+- "What's our total revenue?"
+- "List top customers by spending"
+- "Which tours have the most bookings?"
+- "Update booking 123 to confirmed"
+
+**Ports:**
+- Admin Frontend: http://localhost:3001
+- Admin Agent API: http://localhost:8001
+- Admin Server (MCP): http://localhost:9003
 
 ---
 

@@ -77,5 +77,57 @@ services:
       payment-agent:
         condition: service_healthy
 
+  admin-server:
+    build:
+      context: ./admin_server
+    image: travel-admin-server:latest
+    container_name: travel-admin-server
+    env_file: .env
+    environment:
+      - MCP_TRANSPORT=streamable-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=9003
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/travel
+    ports:
+      - "9003:9003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 9003), timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  admin-agent:
+    build:
+      context: ./admin_agent
+    image: travel-admin-agent:latest
+    container_name: travel-admin-agent
+    env_file: .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8001
+      - ADMIN_SERVER_URL=http://admin-server:9003/mcp
+    ports:
+      - "8001:8001"
+    stdin_open: true
+    tty: true
+    depends_on:
+      admin-server:
+        condition: service_healthy
+
+  admin-frontend:
+    build:
+      context: ./admin_frontend
+    image: travel-admin-frontend:latest
+    container_name: travel-admin-frontend
+    environment:
+      - VITE_ADMIN_AGENT_URL=http://localhost:8001
+    ports:
+      - "3001:80"
+    depends_on:
+      - admin-agent
+
 volumes:
   travel-postgres-data:
